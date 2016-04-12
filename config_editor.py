@@ -274,44 +274,46 @@ class Write_Config_Form(_nps.ActionFormWithMenus):
                     output_file = open(final_destination,"a")
                 else:
                     return
-
             else:
                 output_file = open(final_destination,"w")
 
-                #from the _vm_list dict build config strings and write each to the file
-                for key in _vm_list:
-                    config = ConfigObj(unrepr=True)
-                    vm = _vm_list[key]
+            #from the _vm_list dict build config strings and write each to the file
+            for key in _vm_list:
+                config = ConfigObj(unrepr=True)
+                vm = _vm_list[key]
 
-                    if vm.os_type == "Linux":
-                        config['sysmap '] = "\""+vm.linux_sysmap+"\";"
-                        config['ostype '] = "\""+vm.os_type+"\";"
-                        config['linux_tasks '] = vm.linux_tasks+";"
-                        config['linux_mm '] = vm.linux_mm+";"
-                        config['linux_pid '] = vm.linux_pid+";"
-                        config['linux_pgd '] = vm.linux_pgd+";"
-                    else:
-                        config['ostype '] = "\""+vm.os_type+"\";"
-                        config['win_tasks '] = vm.win_tasks+";"
-                        config['win_pdbase '] = vm.win_pdbase+";"
-                        config['win_pid '] = vm.win_pid+";"
+                if vm.os_type == "Linux":
+                    config['sysmap '] = "\""+vm.linux_sysmap+"\";"
+                    config['ostype '] = "\""+vm.os_type+"\";"
+                    config['linux_tasks '] = vm.linux_tasks+";"
+                    config['linux_mm '] = vm.linux_mm+";"
+                    config['linux_pid '] = vm.linux_pid+";"
+                    config['linux_pgd '] = vm.linux_pgd+";"
+                else:
+                    config['ostype '] = "\""+vm.os_type+"\";"
+                    config['win_tasks '] = vm.win_tasks+";"
+                    config['win_pdbase '] = vm.win_pdbase+";"
+                    config['win_pid '] = vm.win_pid+";"
 
-                    output = vm.name+" "
-                    output = output+str(config)
-                    output = output.replace("'","").replace(",","").replace(":","=")
-                    output = output +"\n"
+                output = vm.name+" "
+                output = output+str(config)
+                output = output.replace("'","").replace(",","").replace(":","=")
+                output = output +"\n"
 
-                    self.status.value ="Writing VM "+vm.name
-                    self.display()
-
-                    output_file.write(output)
-
-                output_file.close()
-                self.status.value+"Done!"
+                self.status.value ="Writing VM "+vm.name
                 self.display()
+
+                output_file.write(output)
+
+            self.status.value+"Done!"
+            self.display()
         except IOError as e:
             self.error_msg("There was an error accessing the file: "+e.detail,ERROR_MSGS[2])
             return
+        finally:
+            if output_file != None:
+                output_file.close()
+
         self.display_text("Finished writing configuration file \""+_conf_file_name+"\" to desintation: "+_conf_file_destination)
 
     def cancel_write():
