@@ -170,17 +170,9 @@ class Btn_WriteConfig(_nps.ButtonPress):
     def whenPressed(self):
         self.parent.generate_config()
 
-class Btn_ListVM(_nps.ButtonPress):
-    def whenPressed(self):
-        self.parent.list_vms()
-
 class Btn_CancelWrite(_nps.ButtonPress):
     def whenPressed(self):
         self.parent.cancel_write()
-
-class Btn_ConfirmRemoveVM(_nps.ButtonPress):
-    def whenPressed(self):
-        self.parent.confirm_remove_vm()
 
 
 '''
@@ -202,107 +194,22 @@ class VM:
         self.win_pdbase = None
         self.win_pid = None
 
-#removes a vm from the list of existing vms
 class Remove_VM_Form(_nps.ActionFormWithMenus):
 
     def create(self):
-
-            #menus
-            self.menu_main = self.add_menu(name="Main Menu", shortcut="m")
-            self.menu_main.addItemsFromList([
-            ("Home Screen", self.home, "h"),
-            ("Add Windows VM", self.start_windows_vm_editor, "w"),
-            ("Add Linux VM", self.start_linux_vm_editor, "t"),
-            ("List All VM's", self.list_vms, "a"),
-            ("Remove VM", self.remove_vm, "r"),
-            ("Write File", self.start_config_writer,"z"),
-            ("Cancel", self.close_menu,"c"),
-            ("About", self.display_text,None,None,(ABOUT_MSGS,)),
-            ("Exit Application", self.exit_app,"x")
-            ])
-
-            self.instructions = self.add(_nps.TitleFixedText, name="Instructions: ", value="Select a virtual machine to remove it from the list")
-            self.nextrely+=1
-            self.vm_option    = self.add(_nps.TitleSelectOne, scroll_ext=True, max_height=10, name='Menu Options', values=[])
-            self.nextrely+=1
-            self.btn_list_vm = self.add(Btn_ListVM, name="List All VM's")
-            self.btn_remove_vm =self.add(Btn_ConfirmRemoveVM, name="Remove VM")
-
-
-    def display_text(self, argument):
-        _nps.notify_confirm(argument)
-
-    def write_file(self):
-        self.parentApp.switchForm('WRITE_CONFIG')
-
-    def list_vms(self):
-        self.parentApp.switchForm('LIST_VM')
-
-    def confirm_remove_vm(self):
-        global _vm_list_size
-        if _vm_list_size == 0:
-            error("There are no virtual machines, please add more virtual machines",ERROR_MSGS[0])
-            return
-
-        opt = self.vm_option.get_selected_objects()
-
-        global _vm_list
-        vm = _vm_list.get(opt[0])
-        #TODO individual OS count change?
-        name = vm.name
-        confirm = _nps.notify_ok_cancel("Are you sure you want to remove the virtual machine "+name,title="Confirm Remove VM")
-        if confirm == False:
-            return
-        del _vm_list[opt[0]]
-        _vm_list_size+=-1
-        self.display_text("Removed virtual machine "+name)
-        self.parentApp.switchForm('REMOVE_VM')
-
-
-    def close_menu(self):
-        #the menu tends to get stuck and as such this is a dirty and easy way to close it
-        1+1
-
-    def exit_app(self):
-        _safe_exit()
-        self.parentApp.setNextForm(None)
-        self.editing = False
-        self.parentApp.switchFormNow()
-
-    def home(self):
-        self.parentApp.switchForm('CONFIG')
-
-    def start_windows_vm_editor(self):
-        self.vm_editor('NEW_WINDOWS')
-
-    def start_linux_vm_editor(self):
-        self.vm_editor('NEW_LINUX')
-
-    def start_config_writer(self):
-        self.parentApp.switchForm('WRITE_CONFIG')
-
-    def list_vms(self):
-        self.parentApp.switchForm('LIST_VM')
-
-    def remove_vm(self):
-        self.parentApp.switchForm('REMOVE_VM')
-
-    def vm_editor(self,os_type):
-        #save current globals and switch
-        self.parentApp.switchForm(os_type)
-
-    def on_cancel(self):
-        self.parentApp.switchFormPrevious()
-
-    def on_ok(self):
-        self.parentApp.switchForm('CONFIG')
+        self.vm_option    = self.add(_nps.TitleSelectOne, scroll_ext=True, max_height=3, name='Menu Options', values=[])
 
     def beforeEditing(self):
         all_vms = []
         #build a list of vms before displaying
         for key in _vm_list:
             vm = _vm_list[key]
-            vm_data = vm.name
+            vm_data = "vm: "+vm.name+" os: "+vm.os_type
+            if vm.os_type =="Linux":
+                vm_data +=" tasks: "+vm.linux_tasks
+                vm_data +=" mm: "+vm.linux_mm
+                vm_data +=" pid: "+vm.linux_pid
+                vm_data +=" pgd: "+vm.linux_pgd
             all_vms.append(vm_data)
 
         self.vm_option.values = all_vms
@@ -362,51 +269,51 @@ class Write_Config_Form(_nps.ActionFormWithMenus):
         try:
             #check if file exists - stop if it does
             if os.path.isfile(final_destination):
-                opt = _nps.notify_ok_cancel("A file with the same name already exists at this location. Would you like to add to this file?", title=ERROR_MSGS[2])
+                opt = _nps.notify_ok_cancel("[paranoid]A file with the same name already exists at this location. Would you like to add to this file?", title=ERROR_MSGS[2])
                 if opt == True:
+                    _nps.notify("Opening file in append mode")
                     output_file = open(final_destination,"a")
                 else:
+                    _nps.notify("Not opening file in append mode")
                     return
             else:
                 output_file = open(final_destination,"w")
 
-            #from the _vm_list dict build config strings and write each to the file
-            for key in _vm_list:
-                config = ConfigObj(unrepr=True)
-                vm = _vm_list[key]
+                #from the _vm_list dict build config strings and write each to the file
+                for key in _vm_list:
+                    config = ConfigObj(unrepr=True)
+                    vm = _vm_list[key]
 
-                if vm.os_type == "Linux":
-                    config['sysmap '] = "\""+vm.linux_sysmap+"\";"
-                    config['ostype '] = "\""+vm.os_type+"\";"
-                    config['linux_tasks '] = vm.linux_tasks+";"
-                    config['linux_mm '] = vm.linux_mm+";"
-                    config['linux_pid '] = vm.linux_pid+";"
-                    config['linux_pgd '] = vm.linux_pgd+";"
-                else:
-                    config['ostype '] = "\""+vm.os_type+"\";"
-                    config['win_tasks '] = vm.win_tasks+";"
-                    config['win_pdbase '] = vm.win_pdbase+";"
-                    config['win_pid '] = vm.win_pid+";"
+                    if vm.os_type == "Linux":
+                        config['sysmap '] = "\""+vm.linux_sysmap+"\";"
+                        config['ostype '] = "\""+vm.os_type+"\";"
+                        config['linux_tasks '] = vm.linux_tasks+";"
+                        config['linux_mm '] = vm.linux_mm+";"
+                        config['linux_pid '] = vm.linux_pid+";"
+                        config['linux_pgd '] = vm.linux_pgd+";"
+                    else:
+                        config['ostype '] = "\""+vm.os_type+"\";"
+                        config['win_tasks '] = vm.win_tasks+";"
+                        config['win_pdbase '] = vm.win_pdbase+";"
+                        config['win_pid '] = vm.win_pid+";"
 
-                output = vm.name+" "
-                output = output+str(config)
-                output = output.replace("'","").replace(",","").replace(":","=")
-                output = output +"\n"
+                    output = vm.name+" "
+                    output = output+str(config)
+                    output = output.replace("'","").replace(",","").replace(":","=")
+                    output = output +"\n"
 
-                self.status.value ="Writing VM "+vm.name
+                    self.status.value ="Writing VM "+vm.name
+                    self.display()
+
+                    output_file.write(output)
+
+                self.status.value+"Done!"
                 self.display()
-
-                output_file.write(output)
-
-            self.status.value+"Done!"
-            self.display()
         except IOError as e:
             self.error_msg("There was an error accessing the file: "+e.detail,ERROR_MSGS[2])
             return
         finally:
-            if output_file != None:
-                output_file.close()
-
+            output_file.close()
         self.display_text("Finished writing configuration file \""+_conf_file_name+"\" to desintation: "+_conf_file_destination)
 
     def cancel_write():
@@ -431,7 +338,7 @@ class Write_Config_Form(_nps.ActionFormWithMenus):
         self.vm_editor('NEW_LINUX')
 
     def remove_vm(self):
-        self.parentApp.switchForm('REMOVE_VM')
+        print "not implemneted"
 
     def list_vms(self):
         self.parentApp.switchForm("LIST_VM")
@@ -441,9 +348,6 @@ class Write_Config_Form(_nps.ActionFormWithMenus):
 
     def on_cancel(self):
         self.parentApp.switchFormPrevious()
-
-    def on_ok(self):
-        self.parentApp.switchForm('CONFIG')
 
     def close_menu(self):
         #the menu tends to get stuck and as such this is a dirty and easy way to close it
@@ -497,11 +401,10 @@ class VM_List_Form(_nps.ActionFormWithMenus):
         self.vm_editor('NEW_LINUX')
 
     def remove_vm(self):
-        self.parentApp.switchForm('REMOVE_VM')
-
+        print "not implemneted"
 
     def list_vms(self):
-        self.parentApp.switchForm('LIST_VM')
+        self.parentApp.switchForm("LIST_VM")
 
     def vm_editor(self,os_type):
         self.parentApp.switchForm(os_type)
@@ -509,15 +412,11 @@ class VM_List_Form(_nps.ActionFormWithMenus):
     def on_cancel(self):
         self.parentApp.switchFormPrevious()
 
-    def on_ok(self):
-        self.parentApp.switchForm('CONFIG')
-
     def close_menu(self):
         #the menu tends to get stuck and as such this is a dirty and easy way to close it
         1+1
 
     def beforeEditing(self):
-
         all_vms = []
         #build a list of vms before displaying
         for key in _vm_list:
@@ -548,7 +447,7 @@ class Add_Windows_Form(_nps.ActionFormWithMenus):
         ("Home Screen", self.home, "h"),
         ("Add Linux VM", self.start_linux_vm_editor, "t"),
         ("List All VM's", self.list_vms, "a"),
-        ("Remove VM", self.remove_vm, "r"),
+        ("Remove VM", self.start_linux_vm_editor, "r"),
         ("Write File", self.start_config_writer,"z"),
         ("Cancel", self.close_menu,"c"),
         ("Exit Application", self.exit_app,"x"),
@@ -604,9 +503,6 @@ class Add_Windows_Form(_nps.ActionFormWithMenus):
     def start_config_writer(self):
         self.parentApp.switchForm('WRITE_CONFIG')
 
-    def remove_vm(self):
-        self.parentApp.switchForm('REMOVE_VM')
-
     def list_vms(self):
         self.parentApp.switchForm("LIST_VM")
 
@@ -625,12 +521,6 @@ class Add_Windows_Form(_nps.ActionFormWithMenus):
         self.win_tasks.value = ""
         self.win_pdbase.value = ""
         self.win_pid.value = ""
-
-    def on_cancel(self):
-        self.parentApp.switchFormPrevious()
-
-    def on_ok(self):
-        self.parentApp.switchForm('CONFIG')
 
     def exit_app(self):
         _safe_exit()
@@ -740,9 +630,6 @@ class Add_Linux_Form(_nps.ActionFormWithMenus):
 
     def on_cancel(self):
         self.parentApp.switchFormPrevious()
-
-    def on_ok(self):
-        self.parentApp.switchForm('CONFIG')
 
     def exit_app(self):
         _safe_exit()
