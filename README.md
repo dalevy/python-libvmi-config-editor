@@ -5,5 +5,8 @@ Creates configuration files for LibVMI assuming one already has the VM offsets -
 The only required dependencies at this time are npyscreen and configobj. The easiest way to install both is using the python setup tool easy_install and then run:
 
 $ sudo easy_install npyscreen
+
+and
+
 $ sudo easy_install configobj
 
